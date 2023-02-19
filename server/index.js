@@ -4,7 +4,7 @@ import dotenv from "dotenv"
 import express from "express";
 import bodyParser from "body-parser";
 import authRoutes from "./routes/auth.js";
-//import userRoutes from "./routes/user.js";
+import userRoutes from "./routes/user.js";
 import {errorHandler} from "./middleWare/errorHandler.js"
 import cookieParser from "cookie-parser"
 
@@ -14,13 +14,13 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(express.urlencoded({ extended: false }))
 app.use(bodyParser.json())
-app.use(cors())
+app.use(cors(process.env.FRONTEND_URL))
 
 // app.get("/", (req, res) => {
 //     res.send("Home Page")
 //   })
 app.use("/auth", authRoutes);
-//app.use("user", userRoutes)
+app.use("user", userRoutes)
 
 
 // Error Middleware

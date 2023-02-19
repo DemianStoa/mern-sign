@@ -2,10 +2,12 @@ import User from "../models/User.js"
 import asyncHandler from "express-async-handler";
 import jwt  from "jsonwebtoken"
 import bcrypt  from "bcrypt"
+import jwt_decode from "jwt-decode"
 import Token  from "../models/Token.js"
 import crypto  from "crypto"
 import bcryt from 'bcrypt'
 import {sendEmail}  from  "../utils/sendEmail.js"
+import { OAuth2Client } from "google-auth-library";
 
 // Generate Token
 export const generateToken = (id) => {
@@ -13,7 +15,7 @@ export const generateToken = (id) => {
   };
   
   // Register User
- export  const registerUser = asyncHandler(async (req, res) => {
+export  const registerUser = asyncHandler(async (req, res) => {
     const { name, email, password } = req.body;
   
     // Validation
@@ -74,6 +76,95 @@ export const generateToken = (id) => {
     }
   });
   
+export const loginWithGoogle = asyncHandler(async (req, res) => {
+    const { userToken } = req.body;
+
+      const client = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID);
+
+  const ticket = await client.verifyIdToken({
+    idToken: userToken,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+ 
+  const payload = ticket.getPayload();
+  
+
+    // payload = jwt_decode(userToken)
+     console.log(payload)
+    const { name, email, picture, sub } = payload;
+    const password = Date.now() + sub;
+    
+  
+    // Check if user exists
+    const user = await User.findOne({ email });
+  
+    if (!user) {
+      //   Create new user
+      const newUser = await User.create({
+        name,
+        email,
+        password,
+        avatar: picture,
+        isVerified: true,
+      });
+  
+      if (newUser) {
+        // Generate Token
+        const token = generateToken(newUser._id);
+  
+        // Send HTTP-only cookie
+        res.cookie("token", token, {
+          path: "/",
+          httpOnly: true,
+          expires: new Date(Date.now() + 1000 * 86400), // 1 day
+          sameSite: "none",
+          secure: true,
+        });
+  
+        const { _id, name, email, bio, avatar, role, isVerified } = newUser;
+  
+        res.status(201).json({
+          _id,
+          name,
+          email,
+          bio,
+          avatar,
+          role,
+          isVerified,
+          token,
+        });
+      }
+    }
+  
+    // User exists, login
+    if (user) {
+      const token = generateToken(user._id);
+  
+      // Send HTTP-only cookie
+      res.cookie("token", token, {
+        path: "/",
+        httpOnly: true,
+        expires: new Date(Date.now() + 1000 * 86400), // 1 day
+        sameSite: "none",
+        secure: true,
+      });
+  
+      const { _id, name, email, bio, avatar, role, isVerified } = user;
+  
+      res.status(201).json({
+        _id,
+        name,
+        email,
+        bio,
+        avatar,
+        role,
+        isVerified,
+        token,
+      });
+    }
+  });
+
   // Login User
 export   const loginUser = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
@@ -110,13 +201,15 @@ export   const loginUser = asyncHandler(async (req, res) => {
     });
   }
     if (user && passwordIsCorrect) {
-      const { _id, name, email, avatar,  bio } = user;
+      const { _id, name, email, avatar,  bio, isVerified, role } = user;
       res.status(200).json({
         _id,
         name,
         email,
-        avatar,   
         bio,
+        avatar,
+        role,
+        isVerified,
         token,
       });
     } else {
@@ -139,6 +232,7 @@ export const logout = asyncHandler(async (req, res) => {
 
  export  const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
+
   const user = await User.findOne({ email });
 
   if (!user) {
@@ -182,7 +276,7 @@ export const logout = asyncHandler(async (req, res) => {
       <a href=${resetUrl} clicktracking=off>${resetUrl}</a>
 
       <p>Regards...</p>
-      <p>Pinvent Team</p>
+      <p>Demian JS</p>
     `;
   const subject = "Password Reset Request";
   const send_to = user.email;
